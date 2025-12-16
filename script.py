@@ -9,9 +9,13 @@ import os
 
 def find_doc():
     mongo_url = os.getenv("MONGO_URI")
-    client = MongoClient(mongo_url)
+
+    if not mongo_url:
+        raise RuntimeError("❌ MONGO_URI not set in environment")
+
+    client = MongoClient(mongo_url, serverSelectionTimeoutMS=20000)
     db = client["adverse_db"]
-    collection = db["adverse_db"]
+    collection = db["adverse_db"]  # verify this name
 
     today = datetime.now().strftime("%Y-%m-%d")
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -133,38 +137,65 @@ final_groups = deduplicate_uuid_groups_final(filtered_groups)
 master_groups = assign_master_id_to_groups(final_groups)
 
 from pymongo import MongoClient
+import os
+from pymongo.errors import PyMongoError
+
 
 def add_groupid_only_for_fetched_docs(
-    mongo_uri,
-    db_name,
-    collection_name,
-    fetched_docs,
-    master_groups
+    mongo_uri: str,
+    db_name: str,
+    collection_name: str,
+    fetched_docs: list,
+    master_groups: dict
 ):
-    client = MongoClient(mongo_uri)
-    collection = client[db_name][collection_name]
+    # 🔐 Hard validation
+    if not mongo_uri:
+        raise RuntimeError("❌ MONGO_URI not set")
 
-    # uuid -> groupid map
-    uuid_to_groupid = {}
-    for groupid, uuid_list in master_groups.items():
-        for u in uuid_list:
-            uuid_to_groupid[u] = groupid
+    client = MongoClient(
+        mongo_uri,
+        serverSelectionTimeoutMS=20000,
+        connectTimeoutMS=20000
+    )
 
-    # sirf fetched docs update karo
-    for doc in fetched_docs:
-        doc_uuid = doc.get("uuid")
-        groupid_value = uuid_to_groupid.get(doc_uuid, "")
+    try:
+        # ✅ force connection check
+        client.admin.command("ping")
 
-        collection.update_one(
-            {"_id": doc["_id"]},
-            {"$set": {"groupid": groupid_value}}
-        )
+        collection = client[db_name][collection_name]
 
-    client.close()
+        # uuid → groupid map
+        uuid_to_groupid = {
+            u: groupid
+            for groupid, uuid_list in master_groups.items()
+            for u in uuid_list
+        }
 
+        # sirf fetched docs update karo
+        for doc in fetched_docs:
+            doc_uuid = doc.get("uuid")
+
+            if not doc_uuid:
+                continue
+
+            groupid_value = uuid_to_groupid.get(doc_uuid)
+
+            # ❌ empty / missing groupid mat daalo
+            if not groupid_value:
+                continue
+
+            collection.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"groupid": groupid_value}}
+            )
+
+    except PyMongoError as e:
+        raise RuntimeError(f"MongoDB update failed: {e}")
+
+    finally:
+        client.close()
 
 mongo_url = os.getenv("MONGO_URI")
-
 add_groupid_only_for_fetched_docs(
     mongo_url,
     "adverse_db",
