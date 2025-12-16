@@ -4,11 +4,11 @@ from collections import defaultdict
 from pymongo import MongoClient
 from rapidfuzz import fuzz
 import uuid
-
+import os
 
 
 def find_doc():
-    mongo_url = "mongodb://gam-user:utiORLKJDSAFH1873akjdsfh@34.93.133.23:27017/adverse_db?authSource=admin"
+    mongo_url = os.getenv("MONGO_URI")
     client = MongoClient(mongo_url)
     db = client["adverse_db"]
     collection = db["adverse_db"]
@@ -163,10 +163,10 @@ def add_groupid_only_for_fetched_docs(
     client.close()
 
 
-mongo_uri="mongodb://gam-user:utiORLKJDSAFH1873akjdsfh@34.93.133.23:27017/adverse_db?authSource=admin"
+mongo_url = os.getenv("MONGO_URI")
 
 add_groupid_only_for_fetched_docs(
-    mongo_uri,
+    mongo_url,
     "adverse_db",
     "adverse_db",
     yehdoc,
