@@ -2,7 +2,7 @@ name: Daily Python Job
 
 on:
   schedule:
-    - cron: '30 5 * * *'   # 9:00 AM IST
+    - cron: '30 6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -10,18 +10,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+      - run: pip install -r requirements.txt
 
       - name: Run Python script
-        run: |
-          python script.py
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: python script.py
