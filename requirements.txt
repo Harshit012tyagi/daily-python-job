@@ -1,0 +1,2 @@
+pip install rapidfuzz
+pip install pymongo
