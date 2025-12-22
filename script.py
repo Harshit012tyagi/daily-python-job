@@ -241,7 +241,7 @@ from pymongo import MongoClient
 from datetime import datetime, timedelta
 from collections import defaultdict
 from datetime import datetime, timedelta
-mongo_url = os.getenv("MONGO_URI")
+mongo_urls = os.getenv("MONGO_URI")
 def delete_last_day_duplicates(db_name, collection_name, mongo_url):
     """
     Deletes duplicate articles from last 1-day data
@@ -250,7 +250,7 @@ def delete_last_day_duplicates(db_name, collection_name, mongo_url):
     Deletes using UUID, not ObjectId.
     """
 
-    client = MongoClient(mongo_url)
+    client = MongoClient(mongo_urls)
     db = client[db_name]
     collection = db[collection_name]
 
@@ -308,14 +308,14 @@ def delete_last_day_duplicates(db_name, collection_name, mongo_url):
 delete_last_day_duplicates(
     db_name="adverse_db",
     collection_name="adverse_db",
-    mongo_url=mongo_url
+    mongo_url=mongo_urls
 )
 
 
 
 def find_and_delete_subset_negative_links_last_day():
 
-    mongo_url=mongo_url
+    mongo_url=mongo_urls
     db_name="adverse_db"
     client = MongoClient(mongo_url)
     db = client[db_name]
@@ -408,7 +408,7 @@ def find_and_delete_subset_negative_links_last_day():
 
     return subset_results
     
-delete_last_day_duplicates(db_name="adverse_db",collection_name="adverse_db",mongo_url=mongo_url) 
+delete_last_day_duplicates(db_name="adverse_db",collection_name="adverse_db",mongo_url=mongo_urls) 
 find_and_delete_subset_negative_links_last_day()
 
 
