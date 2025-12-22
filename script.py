@@ -135,7 +135,35 @@ grouped_data = build_uuid_groups_exact_adjacent(asc_sorted)
 filtered_groups = filter_groups_min_two(grouped_data)
 final_groups = deduplicate_uuid_groups_final(filtered_groups)
 master_groups = assign_master_id_to_groups(final_groups)
+result = []                 # list of dicts
+uuid_to_index = {}          # uuid -> index in result list
 
+for key, uuid_list in master_groups.items():
+    merge_index = None
+
+    # check agar koi bhi uuid pehle aa chuki hai
+    for u in uuid_list:
+        if u in uuid_to_index:
+            merge_index = uuid_to_index[u]
+            break
+
+    if merge_index is not None:
+        # existing group me merge
+        existing_key = list(result[merge_index].keys())[0]
+        existing_list = result[merge_index][existing_key]
+
+        for u in uuid_list:
+            if u not in existing_list:
+                existing_list.append(u)
+            uuid_to_index[u] = merge_index
+    else:
+        # new group
+        result.append({key: uuid_list.copy()})
+        idx = len(result) - 1
+        for u in uuid_list:
+            uuid_to_index[u] = idx
+print(result)
+master_groups=result
 from pymongo import MongoClient
 import os
 from pymongo.errors import PyMongoError
