@@ -135,7 +135,7 @@ grouped_data = build_uuid_groups_exact_adjacent(asc_sorted)
 filtered_groups = filter_groups_min_two(grouped_data)
 final_groups = deduplicate_uuid_groups_final(filtered_groups)
 master_groups = assign_master_id_to_groups(final_groups)
-result = []
+result = []                 # ✅ list
 uuid_to_index = {}
 
 for groupid, uuid_list in master_groups.items():
@@ -159,7 +159,11 @@ for groupid, uuid_list in master_groups.items():
         idx = len(result) - 1
         for u in uuid_list:
             uuid_to_index[u] = idx
-master_groups=result
+master_groups = {
+    groupid: uuid_list
+    for group in result
+    for groupid, uuid_list in group.items()
+}
 
 
 from pymongo import MongoClient
