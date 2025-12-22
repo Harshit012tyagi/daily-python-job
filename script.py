@@ -235,3 +235,184 @@ add_groupid_only_for_fetched_docs(
 )
 
 
+#############################################################################Remove -Similarity#####################################################
+
+from pymongo import MongoClient
+from datetime import datetime, timedelta
+from collections import defaultdict
+from datetime import datetime, timedelta
+mongo_url = os.getenv("MONGO_URI")
+def delete_last_day_duplicates(db_name, collection_name, mongo_url):
+    """
+    Deletes duplicate articles from last 1-day data
+    based on FULL Negative_Profiles + Source match.
+    Keeps only shortest URL per group.
+    Deletes using UUID, not ObjectId.
+    """
+
+    client = MongoClient(mongo_url)
+    db = client[db_name]
+    collection = db[collection_name]
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Fetch only today's + yesterday's docs
+    docs = list(collection.find({
+        "created_date": {"$regex": f"^({today}|{yesterday})"}
+    }))
+
+    group_data = defaultdict(list)
+
+    # Group only these docs
+    for doc in docs:
+        neg_full = doc.get("Negative_Profiles", "").strip()
+        source = doc.get("Source Name", "").strip()
+
+        if not neg_full:
+            continue
+
+        key = (neg_full, source)
+        group_data[key].append(doc)
+
+    delete_uuids = []
+
+    for (neg_full, source), recs in group_data.items():
+        if len(recs) > 1:
+            # sort by URL length ? keep shortest
+            sorted_rec = sorted(recs, key=lambda x: len(x["Web link of news"]))
+
+            keep = sorted_rec[0]
+            deletes = sorted_rec[1:]
+
+            for d in deletes:
+                delete_uuids.append(d["uuid"])
+
+    # Perform delete using UUID
+    if delete_uuids:
+        result = collection.delete_many({"uuid": {"$in": delete_uuids}})
+
+        print("\n======= Deleted UUIDs =======")
+        for u in delete_uuids:
+            print(u)
+
+        print(f"\nTotal deleted: {result.deleted_count}")
+    else:
+        print("\nNo duplicates found for last-day data.")
+
+
+# -----------------------
+# ?? How to call the function
+# -----------------------
+
+delete_last_day_duplicates(
+    db_name="adverse_db",
+    collection_name="adverse_db",
+    mongo_url=mongo_url
+)
+
+
+
+def find_and_delete_subset_negative_links_last_day():
+
+    mongo_url=mongo_url
+    db_name="adverse_db"
+    client = MongoClient(mongo_url)
+    db = client[db_name]
+    collection = db["adverse_db"]
+    # ---- Date Strings ----
+    today = datetime.now().strftime("%Y-%m-%d")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # ---- Fetch Today + Yesterday Articles ----
+    docs = list(collection.find({
+        "created_date": {"$regex": f"^({today}|{yesterday})"}
+    }, {
+        "Source Name": 1,
+        "Negative_Profiles": 1,
+        "Web link of news": 1,
+        "uuid": 1
+    }))
+
+    print(f"\nFetched {len(docs)} docs from last 1 day...\n")
+
+    source_group = defaultdict(list)
+
+    # ---- Group by Source ----
+    for d in docs:
+        src = d.get("Source Name", "").strip()
+        neg = d.get("Negative_Profiles", "").strip()
+
+        if not src or not neg:
+            continue
+
+        source_group[src].append(d)
+
+    subset_results = []
+    uuids_to_delete = []
+
+    # ---- Subset logic ----
+    for src, items in source_group.items():
+        n = len(items)
+
+        for i in range(n):
+            neg1 = set(x.strip().lower() for x in items[i]["Negative_Profiles"].split("|"))
+
+            for j in range(n):
+                if i == j:
+                    continue
+
+                neg2 = set(x.strip().lower() for x in items[j]["Negative_Profiles"].split("|"))
+
+                # subset match
+                if neg1.issubset(neg2):
+
+                    uuid_val = items[i].get("uuid")
+
+                    subset_results.append({
+                        "source": src,
+                        "subset_negative": items[i]["Negative_Profiles"],
+                        "full_negative": items[j]["Negative_Profiles"],
+                        "link": items[i]["Web link of news"],
+                        "uuid": uuid_val
+                    })
+
+                    if uuid_val:
+                        uuids_to_delete.append(uuid_val)
+
+    print("\n===== Subset Negative Links Found (Today + Yesterday Only) =====\n")
+
+    if not subset_results:
+        print("No subset matches found.")
+        return subset_results
+
+    # ---- Print Results ----
+    for x in subset_results:
+        print(
+            f"[{x['source']}]  UUID: {x['uuid']}\n"
+            f"  ? SUBSET: {x['subset_negative']}\n"
+            f"  ? FULL:   {x['full_negative']}\n"
+            f"  ? Link:   {x['link']}\n"
+        )
+
+    # ---- PERFORM DELETE ----
+    if uuids_to_delete:
+        print("\nDeleting following UUIDs from DB:")
+        print(uuids_to_delete)
+
+        delete_result = collection.delete_many({"uuid": {"$in": uuids_to_delete}})
+        print(f"\n? Deleted {delete_result.deleted_count} documents.\n")
+
+    else:
+        print("\nNo UUIDs to delete.\n")
+
+    return subset_results
+    
+delete_last_day_duplicates(db_name="adverse_db",collection_name="adverse_db",mongo_url=mongo_url) 
+find_and_delete_subset_negative_links_last_day()
+
+
+
+
+
+
