@@ -5,6 +5,11 @@ from pymongo import MongoClient
 from rapidfuzz import fuzz
 import uuid
 import os
+from pymongo import MongoClient
+from datetime import datetime, timedelta
+from collections import defaultdict
+from datetime import datetime, timedelta
+mongo_urls = os.getenv("MONGO_URI")
 
 
 def find_doc():
